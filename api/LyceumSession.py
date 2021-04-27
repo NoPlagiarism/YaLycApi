@@ -103,9 +103,9 @@ class LMSSession(requests.Session):
         elif start['preferred_auth_method'] == 'password' and not self.password:
             raise TypeError("Password needed")
 
-        if start['preferred_auth_method'] == 'password':
+        if 'password' in start['auth_methods']:
             self._auth_password(start)
-        elif start['preferred_auth_method'] == 'magic':
+        elif 'otp' in start['auth_methods']:
             self.handlers['2FA'](self, start)
         else:
             raise UnknownLMSApiError(start=start, lms=self)
@@ -161,9 +161,12 @@ class LMSSession(requests.Session):
     def auth_handler(self, user_exists=True):
         raise AuthFailed(self.user, user_exists)
 
-    @staticmethod
     def tfa_handler(self, start):
-        raise TwoFactorNeeded(start, self)
+        """Пытается авторизоваться через введённый пароль, иначе бросает ошибку"""
+        try:
+            self.auth_otp(self.password, start)
+        except AuthFailed:
+            raise TwoFactorNeeded(start, self)
 
     def check_auth(self):
         r = requests.Session.get(self,
